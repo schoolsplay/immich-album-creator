@@ -25,6 +25,8 @@ The script uses Immich's HTTP API to retrieve asset metadata and create albums.
 
 ⚠️ **Important:** Before running the script, make sure you have triggered a rescan of your external library in Immich (via the web UI or API). This ensures all media files are indexed and available via the `/api/view/folder` endpoint.
 
+🔑 Note: You must create an API key in Immich (from your user settings) and set it in the script as the API_KEY value. This key is required to authenticate API requests.
+
 ```bash
 python3 create-album.py
 ```
