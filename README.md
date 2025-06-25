@@ -2,7 +2,9 @@
 
 A simple Python 3 script to automatically create albums in [Immich](https://github.com/immich-app/immich) from a directory structure on your local filesystem.
 
-Each subdirectory under a specified root folder becomes a new album, containing all media assets (images/videos) found in that folder via Immich's `/api/view/folder` endpoint.
+Each subdirectory under a specified root folder becomes a new album, containing all media assets (images/videos) found in that folder.
+
+The script uses Immich's HTTP API to retrieve asset metadata and create albums.
 
 ---
 
@@ -20,6 +22,8 @@ Each subdirectory under a specified root folder becomes a new album, containing 
 ---
 
 ## 🚀 Usage
+
+⚠️ **Important:** Before running the script, make sure you have triggered a rescan of your external library in Immich (via the web UI or API). This ensures all media files are indexed and available via the `/api/view/folder` endpoint.
 
 ```bash
 python3 create-album.py
