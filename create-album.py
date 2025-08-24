@@ -90,9 +90,9 @@ def create_album(album_name: str, asset_ids: list, dry_run: bool):
 
 
 def main(dry_run: bool):
-    logger.info(f"Scanning for directories up to two levels deep in '{LIBRARY_ROOT}'...")
+    logger.info(f"Scanning for directories in '{LIBRARY_ROOT}'...")
 
-    all_level2_dirs = []
+    album_candidate_dirs = []
     try:
         # Scan for level 1 directories
         level1_entries = [entry for entry in os.scandir(LIBRARY_ROOT) if entry.is_dir()]
@@ -100,23 +100,33 @@ def main(dry_run: bool):
         logger.error(f"Could not scan root directory '{LIBRARY_ROOT}': {e}")
         return
 
-    # Collect all potential level 2 directories from non-excluded level 1 directories
+    # Determine which directories should be treated as albums
     for l1_dir in level1_entries:
         # If a level 1 directory matches an exclusion pattern, skip it entirely.
         if any(fnmatch.fnmatch(l1_dir.name, pattern) for pattern in EXCLUSION_PATTERNS):
             logger.info(f"Excluding level 1 directory '{l1_dir.name}' and its contents due to matching exclusion pattern.")
             continue
 
+        level2_dirs_found = []
         try:
             for l2_entry in os.scandir(l1_dir.path):
                 if l2_entry.is_dir():
-                    all_level2_dirs.append(l2_entry)
+                    level2_dirs_found.append(l2_entry)
         except OSError as e:
             logger.warning(f"Could not scan sub-directory '{l1_dir.path}': {e}")
+            continue
 
-    # Filter the collected level 2 directories
+        if level2_dirs_found:
+            # If L2 dirs exist, they are the album candidates
+            album_candidate_dirs.extend(level2_dirs_found)
+        else:
+            # Otherwise, the L1 dir itself is the candidate
+            logger.info(f"Found level 1 directory '{l1_dir.name}' with no subdirectories. Treating it as an album.")
+            album_candidate_dirs.append(l1_dir)
+
+    # Filter all collected candidates against exclusion patterns
     subdirs = [
-        entry for entry in all_level2_dirs
+        entry for entry in album_candidate_dirs
         if not any(fnmatch.fnmatch(entry.name, pattern) for pattern in EXCLUSION_PATTERNS)
     ]
 
