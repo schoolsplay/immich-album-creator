@@ -27,7 +27,7 @@ console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 
 # Rotating file handler
-file_handler = logging.handlers.RotatingFileHandler('create-album.log', maxBytes=1024 * 500, backupCount=2)
+file_handler = logging.handlers.RotatingFileHandler('create-album.log', maxBytes=1024 * 250, backupCount=2)
 file_handler.setLevel(logging.INFO)
 file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(file_formatter)
@@ -90,18 +90,36 @@ def create_album(album_name: str, asset_ids: list, dry_run: bool):
 
 
 def main(dry_run: bool):
-    logger.info(f"Scanning for directories in '{LIBRARY_ROOT}'...")
-    all_subdirs = [entry for entry in os.scandir(LIBRARY_ROOT) if entry.is_dir()]
+    logger.info(f"Scanning for directories up to two levels deep in '{LIBRARY_ROOT}'...")
+
+    all_level2_dirs = []
+    try:
+        # Scan for level 1 directories
+        level1_entries = [entry for entry in os.scandir(LIBRARY_ROOT) if entry.is_dir()]
+    except OSError as e:
+        logger.error(f"Could not scan root directory '{LIBRARY_ROOT}': {e}")
+        return
+
+    # Collect all potential level 2 directories from non-excluded level 1 directories
+    for l1_dir in level1_entries:
+        # If a level 1 directory matches an exclusion pattern, skip it entirely.
+        if any(fnmatch.fnmatch(l1_dir.name, pattern) for pattern in EXCLUSION_PATTERNS):
+            logger.info(f"Excluding level 1 directory '{l1_dir.name}' and its contents due to matching exclusion pattern.")
+            continue
+
+        try:
+            for l2_entry in os.scandir(l1_dir.path):
+                if l2_entry.is_dir():
+                    all_level2_dirs.append(l2_entry)
+        except OSError as e:
+            logger.warning(f"Could not scan sub-directory '{l1_dir.path}': {e}")
+
+    # Filter the collected level 2 directories
     subdirs = [
-        entry for entry in all_subdirs
+        entry for entry in all_level2_dirs
         if not any(fnmatch.fnmatch(entry.name, pattern) for pattern in EXCLUSION_PATTERNS)
     ]
-    included_names = {entry.name for entry in subdirs}
-    excluded_dirs = [entry for entry in all_subdirs if entry.name not in included_names]
-    if excluded_dirs:
-        logger.info(f"Found {len(all_subdirs)} total directories. Excluding {len(excluded_dirs)} based on patterns:")
-        for entry in excluded_dirs:
-            logger.info(f"  - {entry.name}")
+
     total = len(subdirs)
 
     for idx, entry in enumerate(subdirs, start=1):
