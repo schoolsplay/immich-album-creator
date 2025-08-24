@@ -33,7 +33,7 @@ file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
-logger.info("Start logging process")
+logger.info("\n\n=======================\nStart logging process\n=======================")
 
 def get_folder_assets(abs_folder_path: str):
     """Retrieve asset IDs from a folder using its absolute path."""
@@ -96,9 +96,12 @@ def main(dry_run: bool):
         entry for entry in all_subdirs
         if not any(fnmatch.fnmatch(entry.name, pattern) for pattern in EXCLUSION_PATTERNS)
     ]
-    excluded_count = len(all_subdirs) - len(subdirs)
-    if excluded_count > 0:
-        logger.info(f"Found {len(all_subdirs)} total directories. Excluding {excluded_count} based on patterns.")
+    included_names = {entry.name for entry in subdirs}
+    excluded_dirs = [entry for entry in all_subdirs if entry.name not in included_names]
+    if excluded_dirs:
+        logger.info(f"Found {len(all_subdirs)} total directories. Excluding {len(excluded_dirs)} based on patterns:")
+        for entry in excluded_dirs:
+            logger.info(f"  - {entry.name}")
     total = len(subdirs)
 
     for idx, entry in enumerate(subdirs, start=1):
