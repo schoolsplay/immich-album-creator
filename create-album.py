@@ -1,9 +1,10 @@
+import fnmatch
 import os
 import requests
 import argparse
 
 # Configuration constants from creds
-from creds import IMMICH_HOST, LIBRARY_ROOT, API_KEY
+from creds import IMMICH_HOST, LIBRARY_ROOT, API_KEY, EXCLUSION_PATTERNS
 
 
 # Authentication headers
@@ -68,7 +69,15 @@ def create_album(album_name: str, asset_ids: list, dry_run: bool):
 
 
 def main(dry_run: bool):
-    subdirs = [entry for entry in os.scandir(LIBRARY_ROOT) if entry.is_dir()]
+    print(f"[INFO] Scanning for directories in '{LIBRARY_ROOT}'...")
+    all_subdirs = [entry for entry in os.scandir(LIBRARY_ROOT) if entry.is_dir()]
+    subdirs = [
+        entry for entry in all_subdirs
+        if not any(fnmatch.fnmatch(entry.name, pattern) for pattern in EXCLUSION_PATTERNS)
+    ]
+    excluded_count = len(all_subdirs) - len(subdirs)
+    if excluded_count > 0:
+        print(f"[INFO] Found {len(all_subdirs)} total directories. Excluding {excluded_count} based on patterns.")
     total = len(subdirs)
 
     for idx, entry in enumerate(subdirs, start=1):
@@ -81,7 +90,7 @@ def main(dry_run: bool):
             print(f"[SKIP] No assets found in '{abs_path}'")
             continue
 
-        create_album(folder_name, asset_ids, dry_run)
+        #create_album(folder_name, asset_ids, dry_run)
 
 
 if __name__ == "__main__":
