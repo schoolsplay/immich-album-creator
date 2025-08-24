@@ -2,6 +2,8 @@ import fnmatch
 import os
 import requests
 import argparse
+import logging
+import logging.handlers
 
 # Configuration constants from creds
 from creds import IMMICH_HOST, LIBRARY_ROOT, API_KEY, EXCLUSION_PATTERNS
@@ -13,6 +15,25 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
+# Configure logging, a console and rotating file handler
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('create-album')
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+logger.addHandler(console_handler)
+
+# Rotating file handler
+file_handler = logging.handlers.RotatingFileHandler('create-album.log', maxBytes=1024 * 500, backupCount=2)
+file_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+logger.info("Start logging process")
 
 def get_folder_assets(abs_folder_path: str):
     """Retrieve asset IDs from a folder using its absolute path."""
@@ -26,7 +47,7 @@ def get_folder_assets(abs_folder_path: str):
         asset_ids = [item["id"] for item in data]
         return asset_ids
     except requests.RequestException as e:
-        print(f"[ERROR] Failed to get assets for '{abs_folder_path}': {e}")
+        logger.error(f"Failed to get assets for '{abs_folder_path}': {e}")
         return []
 
 
@@ -39,18 +60,18 @@ def album_exists(album_name: str):
         albums = response.json()
         return any(album.get("albumName") == album_name for album in albums)
     except requests.RequestException as e:
-        print(f"[ERROR] Failed to check existing albums: {e}")
+        logger.error(f"Failed to check existing albums: {e}")
         return False
 
 
 def create_album(album_name: str, asset_ids: list, dry_run: bool):
     """Create an album if it does not already exist."""
     if album_exists(album_name):
-        print(f"[SKIP] Album '{album_name}' already exists.")
+        logger.info(f"Album '{album_name}' already exists.")
         return
 
     if dry_run:
-        print(f"[DRY-RUN] Simulated creation of album '{album_name}' with {len(asset_ids)} assets.")
+        logger.debug(f"[DRY-RUN] Simulated creation of album '{album_name}' with {len(asset_ids)} assets.")
         return
 
     url = f"http://{IMMICH_HOST}/api/albums"
@@ -63,13 +84,13 @@ def create_album(album_name: str, asset_ids: list, dry_run: bool):
     try:
         response = requests.post(url, headers=HEADERS, json=payload)
         response.raise_for_status()
-        print(f"[OK] Album created: {album_name} ({len(asset_ids)} assets)")
+        logger.debug(f"Album created: {album_name} ({len(asset_ids)} assets)")
     except requests.RequestException as e:
-        print(f"[ERROR] Failed to create album '{album_name}': {e}")
+        logger.error(f"Failed to create album '{album_name}': {e}")
 
 
 def main(dry_run: bool):
-    print(f"[INFO] Scanning for directories in '{LIBRARY_ROOT}'...")
+    logger.info(f"Scanning for directories in '{LIBRARY_ROOT}'...")
     all_subdirs = [entry for entry in os.scandir(LIBRARY_ROOT) if entry.is_dir()]
     subdirs = [
         entry for entry in all_subdirs
@@ -77,20 +98,20 @@ def main(dry_run: bool):
     ]
     excluded_count = len(all_subdirs) - len(subdirs)
     if excluded_count > 0:
-        print(f"[INFO] Found {len(all_subdirs)} total directories. Excluding {excluded_count} based on patterns.")
+        logger.info(f"Found {len(all_subdirs)} total directories. Excluding {excluded_count} based on patterns.")
     total = len(subdirs)
 
     for idx, entry in enumerate(subdirs, start=1):
         abs_path = entry.path
         folder_name = entry.name
-        print(f"\n[{idx}/{total}] Processing folder: {abs_path}")
+        logger.debug(f"\n[{idx}/{total}] Processing folder: {abs_path}")
 
         asset_ids = get_folder_assets(abs_path)
         if not asset_ids:
-            print(f"[SKIP] No assets found in '{abs_path}'")
+            logger.warning(f"No assets found in '{abs_path}'")
             continue
 
-        #create_album(folder_name, asset_ids, dry_run)
+        create_album(folder_name, asset_ids, dry_run)
 
 
 if __name__ == "__main__":
